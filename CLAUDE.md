@@ -16,8 +16,14 @@ Pending: defined once the technical skeleton exists (29 Jan 2027).
 - Run locally: `<command>`
 
 ## Architecture
-Pending workshops 2 (services, 16 Nov), 7 (API and mobile, 18 Jan) and 8 (repo layout and CI/CD, 25 Jan).
-The proposed layout is in `../mikraal-memory/repo-map.md`. Do not create that structure before those workshops close.
+Provisional layout (see `../mikraal-memory/repo-map.md`); workshops 2, 7 and 8 confirm it.
+
+- `contracts/openapi/`: OpenAPI contracts, written first. Clients and server interfaces are generated from them; never edit generated code.
+- `services/activities/`: Java 21 + Spring Boot, Gradle (Kotlin DSL), PostgreSQL with RLS, Flyway. Holds the `tasks` module.
+- `bff/web/`: Spring Boot BFF for the web. Resolves names of people, positions, councils and events; the web only talks to it.
+- `web/`: Next.js + React + TypeScript + shadcn/ui, pnpm.
+
+Login is a development login with synthetic users for now. Permissions go through OpenFGA (ARQ-04).
 
 ## Watch out for
 - This product handles minors' and health data: never commit real personal data, fixtures included. Test data is always synthetic.
