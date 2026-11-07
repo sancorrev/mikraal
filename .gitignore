@@ -1,0 +1,21 @@
+# Gradle / Java
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+*.class
+# Node / Next.js
+node_modules/
+.next/
+out/
+.pnpm-store/
+# Generated code (regenerated from contracts/)
+**/generated/
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+# Local env
+.env
+.env.local
+*.log

@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.1",
+  "type_definitions": [
+    { "type": "person" },
+    {
+      "type": "group",
+      "relations": {
+        "coordinator": { "this": {} },
+        "scouter": { "union": { "child": [ { "this": {} }, { "computedUserset": { "relation": "coordinator" } } ] } },
+        "task_creator": { "this": {} },
+        "can_create_tasks": { "intersection": { "child": [ { "computedUserset": { "relation": "task_creator" } }, { "computedUserset": { "relation": "scouter" } } ] } },
+        "can_manage_tags": { "computedUserset": { "relation": "coordinator" } }
+      },
+      "metadata": {
+        "relations": {
+          "coordinator": { "directly_related_user_types": [ { "type": "person" } ] },
+          "scouter": { "directly_related_user_types": [ { "type": "person" } ] },
+          "task_creator": { "directly_related_user_types": [ { "type": "person" }, { "type": "group", "relation": "scouter" } ] }
+        }
+      }
+    },
+    {
+      "type": "position",
+      "relations": {
+        "group": { "this": {} },
+        "holder": { "this": {} }
+      },
+      "metadata": {
+        "relations": {
+          "group": { "directly_related_user_types": [ { "type": "group" } ] },
+          "holder": { "directly_related_user_types": [ { "type": "person" } ] }
+        }
+      }
+    },
+    {
+      "type": "task",
+      "relations": {
+        "group": { "this": {} },
+        "creator": { "this": {} },
+        "owner": { "this": {} },
+        "can_view": { "tupleToUserset": { "tupleset": { "relation": "group" }, "computedUserset": { "relation": "scouter" } } },
+        "can_change_status": { "union": { "child": [ { "computedUserset": { "relation": "owner" } }, { "computedUserset": { "relation": "creator" } } ] } },
+        "can_edit": { "union": { "child": [ { "computedUserset": { "relation": "creator" } }, { "tupleToUserset": { "tupleset": { "relation": "group" }, "computedUserset": { "relation": "coordinator" } } } ] } },
+        "can_delete": { "union": { "child": [ { "computedUserset": { "relation": "creator" } }, { "tupleToUserset": { "tupleset": { "relation": "group" }, "computedUserset": { "relation": "coordinator" } } } ] } }
+      },
+      "metadata": {
+        "relations": {
+          "group": { "directly_related_user_types": [ { "type": "group" } ] },
+          "creator": { "directly_related_user_types": [ { "type": "person" } ] },
+          "owner": { "directly_related_user_types": [ { "type": "person" }, { "type": "position", "relation": "holder" } ] }
+        }
+      }
+    }
+  ]
+}

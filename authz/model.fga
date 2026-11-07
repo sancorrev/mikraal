@@ -1,0 +1,30 @@
+# Readable form of authz/model.json (the JSON is what is loaded into OpenFGA).
+# Keep both in sync.
+model
+  schema 1.1
+
+type person
+
+type group
+  relations
+    define coordinator: [person]
+    define scouter: [person] or coordinator
+    # «Crear tareas» is assignable; by default every scouter has it (tuple group:G#scouter).
+    define task_creator: [person, group#scouter]
+    define can_create_tasks: task_creator and scouter
+    define can_manage_tags: coordinator
+
+type position
+  relations
+    define group: [group]
+    define holder: [person]
+
+type task
+  relations
+    define group: [group]
+    define creator: [person]
+    define owner: [person, position#holder]
+    define can_view: scouter from group
+    define can_change_status: owner or creator
+    define can_edit: creator or coordinator from group
+    define can_delete: creator or coordinator from group

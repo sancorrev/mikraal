@@ -1,0 +1,925 @@
+openapi: 3.1.0
+info:
+  title: mikraal · BFF web API
+  version: 0.1.0
+  summary: API that `web/` talks to. Served by `bff/web`.
+  description: |
+    - Same origin as the web: Next.js rewrites `/api/*` to `bff/web` (http://localhost:8080).
+    - Session in an httpOnly cookie (`MIKRAAL_SESSION`, SameSite=Lax). No tokens in the browser.
+    - Writes must send header `X-Requested-With: mikraal-web` (CSRF guard).
+    - Task endpoints mirror `tasks.yaml` (activities service) with names resolved: people, positions, tags, councils and events come back as `{ id, name }` objects, so the web never shows bare ids.
+    - `ETag` / `If-Match` and problem details (RFC 9457) pass through unchanged.
+servers:
+  - url: http://localhost:3000
+    description: Through the Next.js dev server
+  - url: http://localhost:8080
+    description: bff/web directly
+security:
+  - session: []
+tags:
+  - name: Session
+    description: Development login and the current session.
+  - name: Directory
+    description: Names for pickers (people, positions, councils, events).
+  - name: Tasks
+    description: Kraal tasks with names resolved.
+  - name: Tags
+    description: The group's tag catalogue.
+
+paths:
+  /api/dev/people:
+    get:
+      tags: [Session]
+      operationId: listDevPeople
+      summary: Synthetic people available for the development login
+      description: Only in the dev profile. Replaced by the identity provider of workshop 5.
+      security: []
+      responses:
+        '200':
+          description: People from the dev seed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DevPerson'
+
+  /api/session/dev-login:
+    post:
+      tags: [Session]
+      operationId: devLogin
+      summary: Start a session as a synthetic person
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/RequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [personId]
+              properties:
+                personId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Session started; sets the `MIKRAAL_SESSION` cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/session:
+    get:
+      tags: [Session]
+      operationId: getSession
+      summary: The current session
+      responses:
+        '200':
+          description: Current person and the groups where they are a scouter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    delete:
+      tags: [Session]
+      operationId: logout
+      summary: End the session
+      parameters:
+        - $ref: '#/components/parameters/RequestedWith'
+      responses:
+        '204':
+          description: Session ended.
+
+  /api/groups/{groupId}/directory:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+    get:
+      tags: [Directory]
+      operationId: getDirectory
+      summary: People, positions, councils and events of the group, for pickers and filters
+      description: People are the group's scouters only (families never appear).
+      responses:
+        '200':
+          description: The group's directory.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Directory'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/groups/{groupId}/task-capabilities:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+    get:
+      tags: [Tasks]
+      operationId: getTaskCapabilities
+      summary: What the current person may do in the tasks module
+      responses:
+        '200':
+          description: Capabilities.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskCapabilities'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/groups/{groupId}/tasks:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+    get:
+      tags: [Tasks]
+      operationId: listTasks
+      summary: List tasks
+      description: Same filters as the activities service.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/TaskStatus'
+          style: form
+          explode: false
+        - name: assignedTo
+          in: query
+          description: '`me`, `unassigned`, `person:<id>` or `position:<id>`.'
+          schema:
+            type: string
+        - name: tagId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: linked
+          in: query
+          description: '`council:<id>`, `event:<id>` or `position:<id>`.'
+          schema:
+            type: string
+        - name: dueFrom
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: dueTo
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: overdue
+          in: query
+          schema:
+            type: boolean
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of tasks.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskPage'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Tasks]
+      operationId: createTask
+      summary: Create a task
+      parameters:
+        - $ref: '#/components/parameters/RequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTask'
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '200':
+          description: Already created with this `id`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/groups/{groupId}/tasks/{taskId}:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [Tasks]
+      operationId: getTask
+      summary: Get a task
+      responses:
+        '200':
+          description: The task.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Tasks]
+      operationId: updateTask
+      summary: Edit or reassign a task
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/RequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: '#/components/schemas/UpdateTask'
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/VersionMismatch' }
+    delete:
+      tags: [Tasks]
+      operationId: deleteTask
+      summary: Delete a task (final)
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/RequestedWith'
+      responses:
+        '204':
+          description: Deleted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/VersionMismatch' }
+
+  /api/groups/{groupId}/tasks/{taskId}/status-changes:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [Tasks]
+      operationId: changeTaskStatus
+      summary: Change the status of a task
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/RequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeTaskStatus'
+      responses:
+        '200':
+          description: Status changed.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/InvalidTransition' }
+        '412': { $ref: '#/components/responses/VersionMismatch' }
+
+  /api/groups/{groupId}/tasks/{taskId}/recurrence/end:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+      - $ref: '#/components/parameters/TaskId'
+    post:
+      tags: [Tasks]
+      operationId: endTaskRecurrence
+      summary: Stop future instances of a recurring task
+      parameters:
+        - $ref: '#/components/parameters/RequestedWith'
+      responses:
+        '204':
+          description: Recurrence ended.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The task has no active recurrence.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /api/groups/{groupId}/tasks/{taskId}/history:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [Tasks]
+      operationId: getTaskHistory
+      summary: Change history of a task, with names resolved
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of history entries, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskHistoryPage'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/groups/{groupId}/task-tags:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+    get:
+      tags: [Tags]
+      operationId: listTaskTags
+      summary: List the tag catalogue
+      responses:
+        '200':
+          description: Tags sorted by name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/NamedRef'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Tags]
+      operationId: createTaskTag
+      summary: Add a tag
+      parameters:
+        - $ref: '#/components/parameters/RequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagName'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NamedRef'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/groups/{groupId}/task-tags/{tagId}:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+      - name: tagId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    patch:
+      tags: [Tags]
+      operationId: renameTaskTag
+      summary: Rename a tag
+      parameters:
+        - $ref: '#/components/parameters/RequestedWith'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagName'
+      responses:
+        '200':
+          description: Renamed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NamedRef'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Tags]
+      operationId: deleteTaskTag
+      summary: Remove a tag from the catalogue and from every task
+      parameters:
+        - $ref: '#/components/parameters/RequestedWith'
+      responses:
+        '204':
+          description: Removed.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: MIKRAAL_SESSION
+
+  headers:
+    ETag:
+      description: The task `version`, quoted. Send it back in `If-Match`.
+      schema:
+        type: string
+
+  parameters:
+    GroupId:
+      name: groupId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema:
+        type: string
+    RequestedWith:
+      name: X-Requested-With
+      in: header
+      required: true
+      description: Must be `mikraal-web`.
+      schema:
+        type: string
+        const: mikraal-web
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+
+  responses:
+    Unauthorized:
+      description: No session.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Not allowed.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Not found.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ValidationError:
+      description: The request is not valid.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ValidationProblem' }
+    VersionMismatch:
+      description: The task changed since it was read. Reload and retry.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InvalidTransition:
+      description: Status change not allowed from the current status.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Conflicts with existing data (e.g. duplicate tag name).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    NamedRef:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+
+    DevPerson:
+      type: object
+      required: [id, name, isScouter]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: First name and surnames.
+        isScouter:
+          type: boolean
+        positions:
+          type: array
+          items:
+            type: string
+          description: Position names, to help pick a profile.
+
+    Session:
+      type: object
+      required: [person, groups]
+      properties:
+        person:
+          $ref: '#/components/schemas/NamedRef'
+        groups:
+          type: array
+          description: Groups where the person is a scouter. Empty for families.
+          items:
+            type: object
+            required: [id, name, timeZone]
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+              timeZone:
+                type: string
+                examples: [Europe/Madrid]
+
+    DatedRef:
+      type: object
+      required: [id, name, date]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        date:
+          type: string
+          format: date
+
+    Directory:
+      type: object
+      required: [people, positions, councils, events]
+      properties:
+        people:
+          type: array
+          items: { $ref: '#/components/schemas/NamedRef' }
+        positions:
+          type: array
+          items: { $ref: '#/components/schemas/NamedRef' }
+        councils:
+          type: array
+          items: { $ref: '#/components/schemas/DatedRef' }
+        events:
+          type: array
+          items: { $ref: '#/components/schemas/DatedRef' }
+
+    TaskCapabilities:
+      type: object
+      required: [canCreateTasks, canManageTags]
+      properties:
+        canCreateTasks:
+          type: boolean
+        canManageTags:
+          type: boolean
+
+    TaskStatus:
+      type: string
+      enum: [pending, in_progress, paused, finished]
+      description: 'UI labels: «Pendiente», «En curso», «Pausada», «Terminada».'
+
+    RecurrencePeriod:
+      type: string
+      enum: [weekly, monthly, round]
+
+    TaskAction:
+      type: string
+      enum: [change_status, edit, delete, end_recurrence]
+
+    OwnerRef:
+      type: object
+      required: [type, id]
+      properties:
+        type:
+          type: string
+          enum: [person, position]
+        id:
+          type: string
+          format: uuid
+
+    Owner:
+      allOf:
+        - $ref: '#/components/schemas/OwnerRef'
+        - type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+
+    LinkRef:
+      type: object
+      required: [type, id]
+      properties:
+        type:
+          type: string
+          enum: [council, event, position]
+        id:
+          type: string
+          format: uuid
+
+    Link:
+      allOf:
+        - $ref: '#/components/schemas/LinkRef'
+        - type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+
+    Task:
+      type: object
+      required: [id, title, status, owners, tags, links, overdue, unassigned, createdBy, createdAt, updatedAt, version, allowedActions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: [string, 'null']
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        pauseReason:
+          type: [string, 'null']
+        owners:
+          type: array
+          items: { $ref: '#/components/schemas/Owner' }
+        dueDate:
+          type: [string, 'null']
+          format: date
+        reminderDaysBefore:
+          type: [integer, 'null']
+        tags:
+          type: array
+          items: { $ref: '#/components/schemas/NamedRef' }
+        links:
+          type: array
+          items: { $ref: '#/components/schemas/Link' }
+        recurrence:
+          oneOf:
+            - type: object
+              required: [seriesId, period, active]
+              properties:
+                seriesId:
+                  type: string
+                  format: uuid
+                period:
+                  $ref: '#/components/schemas/RecurrencePeriod'
+                active:
+                  type: boolean
+            - type: 'null'
+        overdue:
+          type: boolean
+        unassigned:
+          type: boolean
+        createdBy:
+          $ref: '#/components/schemas/NamedRef'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        version:
+          type: integer
+        allowedActions:
+          type: array
+          items: { $ref: '#/components/schemas/TaskAction' }
+
+    TaskPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Task' }
+        nextCursor:
+          type: [string, 'null']
+
+    CreateTask:
+      type: object
+      required: [title]
+      description: Same as the activities service.
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 5000
+        owners:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/OwnerRef' }
+        dueDate:
+          type: string
+          format: date
+        reminderDaysBefore:
+          type: integer
+          minimum: 0
+          maximum: 30
+        tagIds:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            format: uuid
+        links:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/LinkRef' }
+        recurrence:
+          type: object
+          required: [period]
+          properties:
+            period:
+              $ref: '#/components/schemas/RecurrencePeriod'
+
+    UpdateTask:
+      type: object
+      minProperties: 1
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        owners:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/OwnerRef' }
+        dueDate:
+          type: [string, 'null']
+          format: date
+        reminderDaysBefore:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 30
+        tagIds:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            format: uuid
+        links:
+          type: array
+          maxItems: 20
+          items: { $ref: '#/components/schemas/LinkRef' }
+
+    ChangeTaskStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        pauseReason:
+          type: string
+          minLength: 1
+          maxLength: 500
+
+    TaskHistoryEntry:
+      type: object
+      required: [id, at, actor, kind]
+      properties:
+        id:
+          type: string
+          format: uuid
+        at:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/NamedRef'
+        onBehalfOfPosition:
+          oneOf:
+            - $ref: '#/components/schemas/NamedRef'
+            - type: 'null'
+        kind:
+          type: string
+          enum: [created, edited, status_changed, owner_removed_on_leave, recurrence_ended, instance_created]
+        changes:
+          type: object
+          description: Field → { from, to }. Ids inside are resolved to names by the BFF where it can.
+          additionalProperties:
+            type: object
+            properties:
+              from: {}
+              to: {}
+
+    TaskHistoryPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/TaskHistoryEntry' }
+        nextCursor:
+          type: [string, 'null']
+
+    TagName:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+
+    ValidationProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            errors:
+              type: array
+              items:
+                type: object
+                required: [field, code]
+                properties:
+                  field:
+                    type: string
+                  code:
+                    type: string
