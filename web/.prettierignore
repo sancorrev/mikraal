@@ -1,0 +1,4 @@
+generated/
+.next/
+docs/
+pnpm-lock.yaml

@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: bff-web
+  messages:
+    basename: messages
+    fallback-to-system-locale: false
+  http:
+    serviceclient:
+      activities:
+        base-url: ${MIKRAAL_ACTIVITIES_URL:http://localhost:8081}
+        connect-timeout: 2s
+        read-timeout: 10s
+
+server:
+  port: 8080
+  servlet:
+    session:
+      tracking-modes: cookie
+      cookie:
+        name: MIKRAAL_SESSION
+        http-only: true
+        same-site: lax

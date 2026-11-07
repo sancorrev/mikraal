@@ -1,0 +1,172 @@
+@import "tailwindcss";
+
+/* Design tokens from mikraal-memory/visual-identity.md. */
+:root {
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-muted: #f4f4f4;
+  --ink: #0a0a0a;
+  --ink-muted: #5c5c5c;
+  --ink-disabled: #a3a3a3;
+  --border: #ececec;
+  --border-control: #858585;
+  --violet: #8a5cff;
+  --violet-light: #f1ecff;
+  --orange: #fe4a23;
+  --orange-light: #ffede7;
+  --on-violet: #0a0a0a;
+  --popover-shadow: 0 4px 16px rgb(0 0 0 / 10%);
+  --modal-shadow: 0 16px 48px rgb(0 0 0 / 18%);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #0a0a0a;
+    --surface-raised: #1c1c1c;
+    --surface-muted: #262626;
+    --ink: #ffffff;
+    --ink-muted: #b5b5b5;
+    --ink-disabled: #5c5c5c;
+    --border: #2a2a2a;
+    --border-control: #7a7a7a;
+    --violet-light: #2a2147;
+    --orange-light: #3a1d15;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-muted: var(--surface-muted);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-disabled: var(--ink-disabled);
+  --color-border: var(--border);
+  --color-border-control: var(--border-control);
+  --color-violet: var(--violet);
+  --color-violet-light: var(--violet-light);
+  --color-orange: var(--orange);
+  --color-orange-light: var(--orange-light);
+  --color-on-violet: var(--on-violet);
+
+  --font-heading: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  --text-display: 38px;
+  --text-display--line-height: 40px;
+  --text-display--letter-spacing: -0.02em;
+  --text-h1: 28px;
+  --text-h1--line-height: 34px;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h2: 22px;
+  --text-h2--line-height: 28px;
+  --text-h2--letter-spacing: -0.01em;
+  --text-h3: 19px;
+  --text-h3--line-height: 24px;
+  --text-h3--letter-spacing: -0.01em;
+  --text-body: 15px;
+  --text-body--line-height: 22px;
+  --text-small: 13px;
+  --text-small--line-height: 18px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-overline: 11px;
+  --text-overline--line-height: 14px;
+  --text-overline--letter-spacing: 0.08em;
+
+  --radius-chip: 6px;
+  --radius-control: 10px;
+  --radius-card: 16px;
+  --radius-sheet: 24px;
+
+  --shadow-popover: var(--popover-shadow);
+  --shadow-modal: var(--modal-shadow);
+
+  --ease-enter: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  --breakpoint-xl: 75rem;
+}
+
+@layer base {
+  html {
+    background: var(--surface);
+  }
+
+  body {
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 22px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-heading);
+    font-weight: 600;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--violet);
+    outline-offset: 2px;
+  }
+
+  /* Lucide icons: 1.75 stroke, never filled. */
+  svg.lucide {
+    stroke-width: 1.75;
+    fill: none;
+    flex-shrink: 0;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-fade-in {
+  animation: fade-in 200ms var(--ease-enter);
+}
+
+@utility animate-rise-in {
+  animation: rise-in 200ms var(--ease-enter);
+}

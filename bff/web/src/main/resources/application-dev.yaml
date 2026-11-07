@@ -1,0 +1,4 @@
+mikraal:
+  dev:
+    seed-path: ${MIKRAAL_DEV_SEED_PATH:../../dev/seed/seed.json}
+    jwt-secret: ${MIKRAAL_DEV_JWT_SECRET:mikraal-dev-only-secret-change-me-0123456789abcdef}

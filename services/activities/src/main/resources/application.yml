@@ -1,0 +1,27 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: activities
+  mvc:
+    problemdetails:
+      enabled: true
+  flyway:
+    schemas: activities
+    default-schema: activities
+    placeholders:
+      appRole: activities_app
+
+mikraal:
+  tasks:
+    # Recurrence instances and deadline reminders. "-" disables the job.
+    jobs-cron: "0 */15 * * * *"
+    default-time-zone: Europe/Madrid
+  seed:
+    path: ../../dev/seed/seed.json
+
+logging:
+  level:
+    # The generated PATCH signature puts @Valid on a raw ObjectNode (merge patch); validation is done by hand.
+    org.hibernate.validator.internal.metadata.aggregated.CascadingMetaDataBuilder: error

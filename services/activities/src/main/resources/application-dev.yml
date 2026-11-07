@@ -1,0 +1,21 @@
+# Local development against `docker compose up -d` (see docs/dev-conventions.md). Synthetic data only.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/activities?currentSchema=activities
+    username: activities_app
+    password: activities_app
+  flyway:
+    user: activities_owner
+    password: activities_owner
+
+mikraal:
+  jwt:
+    secret: ${MIKRAAL_DEV_JWT_SECRET:mikraal-dev-only-secret-change-me-0123456789abcdef}
+    issuer: mikraal-dev
+    audience: mikraal-activities
+  openfga:
+    api-url: http://localhost:8082
+    store-name: mikraal-dev
+    create-store-if-missing: true
+  dev-bootstrap:
+    model-path: ../../authz/model.json
