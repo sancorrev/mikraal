@@ -5,19 +5,24 @@ import { useCallback, useMemo } from "react";
 import type { TaskFilters } from "@/lib/api/queries";
 import { isTaskStatus } from "@/lib/task-status";
 
-export type FilterKey = "owner" | "status" | "tag" | "linked" | "from" | "to" | "overdue";
+export type FilterKey = "owner" | "status" | "tag" | "linked" | "from" | "to" | "overdue" | "view";
+export type TaskView = "board" | "list";
 
-/** `owner` values: `me` (default), `all`, `unassigned`, `person:<id>`, `position:<id>`. */
+/** `owner` values: `all` (default), `me`, `unassigned`, `person:<id>`, `position:<id>`. */
 export const OWNER_ALL = "all";
 export const OWNER_ME = "me";
 
-/** Filters live in the URL so a view can be shared and survives a reload. */
+/** What «Quitar filtros» keeps: who the tasks are for and how they are shown. */
+const KEPT_ON_CLEAR: readonly FilterKey[] = ["owner", "view"];
+
+/** Filters and the view live in the URL so a view can be shared and survives a reload. */
 export function useTaskFilters() {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
-  const owner = params.get("owner") ?? OWNER_ME;
+  const owner = params.get("owner") ?? OWNER_ALL;
+  const view: TaskView = params.get("view") === "list" ? "list" : "board";
   const statusParam = params.get("status") ?? "";
   const status = useMemo(() => statusParam.split(",").filter(isTaskStatus), [statusParam]);
   const tag = params.get("tag") ?? "";
@@ -39,25 +44,52 @@ export function useTaskFilters() {
     [owner, status, tag, linked, from, to, overdue],
   );
 
+  const replace = useCallback(
+    (next: URLSearchParams) => {
+      const query = next.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    },
+    [pathname, router],
+  );
+
   const setFilter = useCallback(
     (key: FilterKey, value: string) => {
       const next = new URLSearchParams(params);
       if (value) next.set(key, value);
       else next.delete(key);
-      const query = next.toString();
-      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+      replace(next);
     },
-    [params, pathname, router],
+    [params, replace],
   );
 
   const clearRefinements = useCallback(() => {
     const next = new URLSearchParams();
-    if (params.has("owner")) next.set("owner", owner);
-    const query = next.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }, [owner, params, pathname, router]);
+    for (const key of KEPT_ON_CLEAR) {
+      const value = params.get(key);
+      if (value) next.set(key, value);
+    }
+    replace(next);
+  }, [params, replace]);
 
   const refined = status.length > 0 || Boolean(tag || linked || from || to || overdue);
+  /** Filters that only show inside «Más filtros» (the toolbar shows the rest). */
+  const hiddenCount = [owner !== OWNER_ALL && owner !== OWNER_ME, status.length > 0, from, to, overdue].filter(
+    Boolean,
+  ).length;
 
-  return { owner, status, tag, linked, from, to, overdue, refined, apiFilters, setFilter, clearRefinements };
+  return {
+    owner,
+    view,
+    status,
+    tag,
+    linked,
+    from,
+    to,
+    overdue,
+    refined,
+    hiddenCount,
+    apiFilters,
+    setFilter,
+    clearRefinements,
+  };
 }

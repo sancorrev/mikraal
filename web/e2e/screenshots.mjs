@@ -4,7 +4,7 @@
  */
 import { mkdirSync } from "node:fs";
 import { BASE_URL, chromium, desktop, mobile } from "./lib.mjs";
-import { groupId, routeApi } from "./fixtures.mjs";
+import { groupId, routeApi, today } from "./fixtures.mjs";
 
 const out = new URL("../docs/screenshots/", import.meta.url).pathname;
 mkdirSync(out, { recursive: true });
@@ -13,7 +13,8 @@ const tasksUrl = `${BASE_URL}/groups/${groupId}/tasks`;
 const shots = [
   ["login", `${BASE_URL}/login`],
   ["task-list", tasksUrl],
-  ["task-list-all", `${tasksUrl}?owner=all&status=pending,paused`],
+  ["task-list-table", `${tasksUrl}?view=list`],
+  ["task-list-filtered", `${tasksUrl}?owner=me&status=pending,paused`],
   ["task-detail", `${tasksUrl}/0193a000-0000-7000-8000-0000000000a2`],
   ["task-create", `${tasksUrl}/new`],
   ["task-edit", `${tasksUrl}/0193a000-0000-7000-8000-0000000000a2/edit`],
@@ -39,6 +40,7 @@ for (const [size, options] of [
       reducedMotion: "reduce",
     });
     const page = await context.newPage();
+    await page.clock.setFixedTime(new Date(today));
     await routeApi(page);
     const suffix = scheme === "dark" ? "-dark" : "";
     const list = scheme === "dark" ? shots.filter(([name]) => ["task-list", "task-detail"].includes(name)) : shots;

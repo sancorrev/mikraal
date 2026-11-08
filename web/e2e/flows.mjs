@@ -3,7 +3,7 @@
  */
 import assert from "node:assert/strict";
 import { BASE_URL, chromium, desktop, watchErrors } from "./lib.mjs";
-import { groupId, routeApi, tasks } from "./fixtures.mjs";
+import { groupId, routeApi, tasks, today } from "./fixtures.mjs";
 
 const tasksUrl = `${BASE_URL}/groups/${groupId}/tasks`;
 const [overdueTask, pausedTask, pendingTask, , finishedTask] = tasks;
@@ -44,6 +44,73 @@ function capture(page, method, pattern, reply) {
   });
   return calls;
 }
+
+await flow("the dashboard counts the kraal's open tasks and groups them by status", async (page) => {
+  await page.clock.setFixedTime(new Date(today));
+  await page.goto(tasksUrl);
+  await page.getByRole("heading", { level: 1, name: "Tareas del kraal" }).waitFor();
+  const stats = page.getByRole("region", { name: "Resumen" });
+  await stats.getByText("12 Tareas abiertas").waitFor();
+  for (const text of ["3 Vencen esta semana", "3 Pausadas", "1 Vencidas"]) await stats.getByText(text).waitFor();
+  await page.getByText("Actualizado hoy a las 12:40").waitFor();
+  await page.getByRole("link", { name: "Tareas 12 abiertas" }).waitFor();
+  const column = (name) => page.getByRole("region", { name: new RegExp(`^${name}`) });
+  for (const [name, count] of [
+    ["Pendiente", 5],
+    ["En curso", 4],
+    ["Pausada", 3],
+    ["Terminada", 3],
+  ]) {
+    assert.equal(await column(name).getByRole("listitem").count(), count, name);
+  }
+  await column("En curso").getByText("Vencida: jue 5 nov").waitFor();
+  await column("Pausada").getByText("Faltan tres familias por firmar.").waitFor();
+  assert.equal(await column("Pendiente").getByRole("link", { name: "Añadir tarea" }).count(), 1);
+  assert.equal(await column("Terminada").getByRole("link", { name: "Añadir tarea" }).count(), 0);
+});
+
+await flow("«Mis tareas», menus and the list view live in the URL", async (page) => {
+  const requests = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/tasks?")) requests.push(new URL(request.url()).searchParams);
+  });
+  await page.goto(tasksUrl);
+  await page.getByRole("heading", { level: 1, name: "Tareas del kraal" }).waitFor();
+  await page.getByRole("button", { name: "Mis tareas" }).click();
+  await page.waitForURL(/owner=me/);
+  await page.getByRole("button", { name: /^Etiqueta: todas/ }).click();
+  await page.getByRole("menuitemradio", { name: "Tesorería" }).click();
+  await page.waitForURL(/tag=/);
+  await page.getByRole("button", { name: "Etiqueta: Tesorería" }).waitFor();
+  await page.getByRole("tab", { name: "Lista" }).click();
+  await page.waitForURL(/view=list/);
+  await page.reload();
+  await page.getByRole("tab", { name: "Lista", selected: true }).waitFor();
+  assert.equal(await page.getByRole("button", { name: "Mis tareas" }).getAttribute("aria-pressed"), "true");
+  const rows = page.getByRole("table").getByRole("row");
+  await rows.nth(1).waitFor();
+  assert.deepEqual(await rows.locator("td:first-child").allInnerTexts(), [
+    "Reclamar los recibos pendientes de octubre",
+    "Pedir presupuesto del albergue de Navidad",
+  ]);
+  assert.ok(requests.some((params) => params.get("assignedTo") === "me" && params.get("tagId")));
+  const summary = (params) => params.get("status") === "pending,in_progress,paused" && !params.has("assignedTo");
+  assert.ok(requests.some(summary), "the counts ignore the filters");
+  await page.getByRole("button", { name: "Quitar filtros" }).click();
+  await page.waitForURL((url) => !url.searchParams.has("tag") && url.searchParams.get("view") === "list");
+});
+
+await flow("picked statuses are the board's columns", async (page) => {
+  await page.goto(`${tasksUrl}?status=pending,paused`);
+  await page.getByRole("heading", { level: 1, name: "Tareas del kraal" }).waitFor();
+  const more = page.getByRole("button", { name: /^Más filtros/ });
+  assert.equal(await more.getAttribute("aria-expanded"), "true", "opens when a hidden filter is on");
+  assert.equal(await more.getAttribute("aria-label"), "Más filtros, 1 activo");
+  const columns = page.getByRole("region", { name: /^(Pendiente|En curso|Pausada|Terminada)\b/ });
+  await page.getByRole("region", { name: /^Pausada/ }).waitFor();
+  assert.equal(await columns.count(), 2);
+  await page.getByRole("region", { name: /^Pendiente/ }).waitFor();
+});
 
 await flow("pause asks for a reason and sends it with If-Match", async (page) => {
   const calls = capture(page, "POST", /status-changes$/, (route) =>

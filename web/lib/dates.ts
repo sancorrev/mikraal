@@ -50,3 +50,31 @@ export function formatInstantDate(value: string, locale: string, timeZone: strin
     new Date(value),
   );
 }
+
+/** Today (YYYY-MM-DD) in the group's time zone, for comparing with deadlines. */
+export function todayIn(timeZone: string, now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: safeTimeZone(timeZone),
+  }).formatToParts(now);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+/** A local date (YYYY-MM-DD) moved by a number of days. */
+export function addDays(value: string, days: number): string {
+  const date = parseLocalDate(value);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** 24 h time of an instant in the group's time zone: «12:40». */
+export function formatTime(value: number | string | Date, locale: string, timeZone: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    timeStyle: "short",
+    hourCycle: "h23",
+    timeZone: safeTimeZone(timeZone),
+  }).format(new Date(value));
+}

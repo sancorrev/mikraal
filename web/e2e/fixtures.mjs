@@ -19,7 +19,11 @@ const position = (name) => {
 };
 const event = (index) => ({ id: seed.events[index].id, name: seed.events[index].title });
 
+const council = (index) => ({ id: seed.councils[index].id, name: seed.councils[index].title });
+
 const lucia = person("0193a000-0000-7000-8000-000000000011");
+const javier = person("0193a000-0000-7000-8000-000000000012");
+const marta = person("0193a000-0000-7000-8000-000000000013");
 const pablo = person("0193a000-0000-7000-8000-000000000014");
 const tags = seed.taskTags.map((name, index) => ({ id: `0193a000-0000-7000-8000-0000000000${51 + index}`, name }));
 const tag = (name) => tags.find((candidate) => candidate.name === name);
@@ -117,7 +121,134 @@ export const tasks = [
     dueDate: "2026-11-02",
     tags: [],
   },
+  // From here on, only to fill the dashboard: overdue flags assume today is 2026-11-08.
+  {
+    ...base,
+    id: "0193a000-0000-7000-8000-0000000000a6",
+    title: "Revisar los cambios de datos de cuatro familias",
+    status: "pending",
+    owners: [ownerOf(position("Secretaría"), "position")],
+    dueDate: "2026-11-10",
+    tags: [tag("Familias")],
+  },
+  {
+    ...base,
+    id: "0193a000-0000-7000-8000-0000000000a7",
+    title: "Renovar dos certificados de delitos de naturaleza sexual",
+    status: "pending",
+    owners: [ownerOf(position("LOPIVI"), "position")],
+    dueDate: "2026-11-30",
+    tags: [],
+  },
+  {
+    ...base,
+    id: "0193a000-0000-7000-8000-0000000000a8",
+    title: "Preparar la circular de diciembre",
+    status: "pending",
+    owners: [ownerOf(lucia, "person")],
+    dueDate: "2026-11-27",
+    tags: [tag("Familias")],
+    links: [{ type: "council", ...council(0) }],
+  },
+  {
+    ...base,
+    id: "0193a000-0000-7000-8000-0000000000a9",
+    title: "Revisar seis justificantes de transferencia",
+    status: "in_progress",
+    owners: [ownerOf(position("Tesorería"), "position"), ownerOf(javier, "person")],
+    dueDate: "2026-11-13",
+    tags: [tag("Tesorería")],
+  },
+  {
+    ...base,
+    id: "0193a000-0000-7000-8000-0000000000aa",
+    title: "Reservar el autobús del campamento",
+    status: "in_progress",
+    owners: [ownerOf(pablo, "person"), ownerOf(lucia, "person")],
+    dueDate: "2026-11-20",
+    tags: [tag("Campamento")],
+    links: [{ type: "event", ...event(1) }],
+  },
+  {
+    ...base,
+    id: "0193a000-0000-7000-8000-0000000000ab",
+    title: "Preparar el cierre del trimestre",
+    status: "in_progress",
+    owners: [ownerOf(position("Tesorería"), "position")],
+    dueDate: "2026-12-31",
+    tags: [tag("Tesorería")],
+  },
+  {
+    ...base,
+    id: "0193a000-0000-7000-8000-0000000000ac",
+    title: "Recoger las autorizaciones del campamento",
+    status: "paused",
+    pauseReason: "Faltan tres familias por firmar.",
+    owners: [ownerOf(position("Coordinación de sección · Manada"), "position")],
+    dueDate: "2026-12-11",
+    tags: [tag("Campamento"), tag("Familias")],
+    links: [{ type: "event", ...event(1) }],
+  },
+  {
+    ...base,
+    id: "0193a000-0000-7000-8000-0000000000ad",
+    title: "Reclamar los recibos pendientes de octubre",
+    status: "paused",
+    pauseReason: "Esperando respuesta de cuatro familias.",
+    owners: [ownerOf(position("Tesorería"), "position"), ownerOf(lucia, "person")],
+    dueDate: "2026-11-12",
+    tags: [tag("Tesorería"), tag("Familias")],
+  },
+  {
+    ...base,
+    id: "0193a000-0000-7000-8000-0000000000ae",
+    title: "Abrir el censo de la ronda",
+    status: "finished",
+    owners: [ownerOf(position("Secretaría"), "position"), ownerOf(lucia, "person")],
+    dueDate: "2026-10-01",
+    tags: [tag("Familias")],
+  },
+  {
+    ...base,
+    id: "0193a000-0000-7000-8000-0000000000af",
+    title: "Cerrar la inscripción de la salida de manada",
+    status: "finished",
+    owners: [ownerOf(marta, "person")],
+    dueDate: "2026-10-28",
+    tags: [tag("Campamento")],
+    links: [{ type: "event", ...event(0) }],
+  },
 ];
+
+/** The day the fixtures were written for: freeze the browser clock here for stable screenshots. */
+export const today = "2026-11-08T12:40:00+01:00";
+
+const myOwners = new Set([lucia.id, position("Coordinación de grupo").id]);
+
+/** Same filters and order as the API (deadline, none last, then id). */
+function listTasks(params) {
+  const statuses = params.get("status")?.split(",") ?? [];
+  const assignedTo = params.get("assignedTo");
+  const [ownerType, ownerId] = assignedTo?.split(":") ?? [];
+  const linked = params.get("linked");
+  const tagId = params.get("tagId");
+  const dueFrom = params.get("dueFrom");
+  const dueTo = params.get("dueTo");
+  return tasks
+    .filter((task) => statuses.length === 0 || statuses.includes(task.status))
+    .filter((task) => {
+      if (!assignedTo) return true;
+      if (assignedTo === "me") return task.owners.some((owner) => myOwners.has(owner.id));
+      if (assignedTo === "unassigned") return task.owners.length === 0;
+      return task.owners.some((owner) => owner.type === ownerType && owner.id === ownerId);
+    })
+    .filter((task) => !tagId || task.tags.some((candidate) => candidate.id === tagId))
+    .filter((task) => !linked || task.links.some((link) => `${link.type}:${link.id}` === linked))
+    .filter((task) => params.get("overdue") !== "true" || task.overdue)
+    .filter((task) => !dueFrom || (task.dueDate && task.dueDate >= dueFrom))
+    .filter((task) => !dueTo || (task.dueDate && task.dueDate <= dueTo))
+    .sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999") || a.id.localeCompare(b.id));
+}
 
 export const history = {
   items: [
@@ -167,9 +298,10 @@ export async function routeApi(page) {
     if (path === "/directory") return json(directory);
     if (path === "/task-tags") return json(tagList);
     if (path === "/tasks" && method === "GET") {
-      const mine = url.searchParams.get("assignedTo") === "me";
-      const items = mine ? tasks.filter((task) => task.id !== "0193a000-0000-7000-8000-0000000000a4") : tasks;
-      return json({ items, nextCursor: mine ? null : "next" });
+      // A second page is empty. The unfiltered list claims one, so «Cargar más» shows up.
+      if (url.searchParams.has("cursor")) return json({ items: [], nextCursor: null });
+      const unfiltered = [...url.searchParams.keys()].length === 0;
+      return json({ items: listTasks(url.searchParams), nextCursor: unfiltered ? "next" : null });
     }
     const detail = path.match(/^\/tasks\/([^/]+)(\/history)?$/);
     if (detail) {

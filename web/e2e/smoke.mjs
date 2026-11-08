@@ -51,22 +51,36 @@ for (const [name, options] of [
     await checkAxe(page, "login");
   });
 
-  await step(`${name}: login leads to the task list`, async () => {
+  await step(`${name}: login leads to the task dashboard`, async () => {
     await page
       .getByRole("button", { name: /Entrar como/ })
       .first()
       .click();
     await page.waitForURL(`**/groups/${groupId}/tasks`);
-    await page.getByRole("heading", { level: 1, name: "Mis tareas" }).waitFor();
-    await page.getByRole("heading", { name: "Mis tareas" }).last().waitFor();
+    await page.getByRole("heading", { level: 1, name: "Tareas del kraal" }).waitFor();
+    await page.getByRole("tab", { name: "Tablero", selected: true }).waitFor();
+    await page.waitForFunction(() => !document.body.innerText.includes("Cargando…"));
+    await checkAxe(page, "board");
+  });
+
+  await step(`${name}: «Mis tareas» and the list view go into the URL`, async () => {
+    await page.getByRole("button", { name: "Mis tareas" }).click();
+    await page.waitForURL(/owner=me/);
+    assert.equal(await page.getByRole("button", { name: "Mis tareas" }).getAttribute("aria-pressed"), "true");
+    await page.getByRole("tab", { name: "Lista" }).click();
+    await page.waitForURL(/view=list/);
     await page.waitForFunction(() => !document.body.innerText.includes("Cargando…"));
     await checkAxe(page, "list");
   });
 
-  await step(`${name}: owner filter switches the view`, async () => {
-    await page.getByLabel("Responsable").selectOption("all");
-    await page.waitForURL(/owner=all/);
-    await page.getByRole("heading", { level: 1, name: "Tareas" }).waitFor();
+  await step(`${name}: filter menus and «Más filtros» open`, async () => {
+    await page.getByRole("button", { name: /^Etiqueta:/ }).click();
+    await page.getByRole("menuitemradio", { name: "Cualquier etiqueta" }).waitFor();
+    await checkAxe(page, "tag menu");
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /^Más filtros/ }).click();
+    await page.getByLabel("Responsable").waitFor();
+    await checkAxe(page, "more filters");
   });
 
   await step(`${name}: task detail renders`, async () => {

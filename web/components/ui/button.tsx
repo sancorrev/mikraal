@@ -17,6 +17,7 @@ export const buttonVariants = cva(
         default: "h-12 px-4 text-body lg:h-10",
         dense: "h-11 px-3 text-small lg:h-8 [&_svg]:size-4",
         icon: "size-12 lg:size-10",
+        iconDense: "size-11 lg:size-8 [&_svg]:size-4",
       },
     },
     defaultVariants: { variant: "secondary", size: "default" },

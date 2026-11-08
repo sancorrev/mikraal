@@ -1,6 +1,7 @@
 "use client";
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { addDays, todayIn } from "@/lib/dates";
 import { api, type Task } from "./client";
 import { unwrap } from "./problem";
 
@@ -82,6 +83,46 @@ export function useTaskPages(groupId: string, filters: TaskFilters) {
         }),
       ),
     getNextPageParam: (page) => page.nextCursor ?? undefined,
+  });
+}
+
+/** Kraal-wide counts of open tasks, as of when they were fetched. */
+export type TaskSummary = { open: number; dueThisWeek: number; paused: number; overdue: number };
+
+const OPEN_STATUSES: Task["status"][] = ["pending", "in_progress", "paused"];
+/** 10 pages of 100: past that, the counts are a lower bound. */
+const SUMMARY_MAX_PAGES = 10;
+
+/**
+ * Counts for the dashboard and the navigation, whatever the list filters. The API has no
+ * counts, so this reads every open task. «This week» is the next seven days, today included,
+ * in the group's time zone.
+ */
+export function useTaskSummary(groupId: string, timeZone: string) {
+  return useQuery({
+    queryKey: [...keys.tasks(groupId), "summary"],
+    queryFn: async (): Promise<TaskSummary> => {
+      const open: Task[] = [];
+      let cursor: string | undefined;
+      for (let page = 0; page < SUMMARY_MAX_PAGES; page++) {
+        const result = unwrap(
+          await api.GET("/api/groups/{groupId}/tasks", {
+            params: { path: { groupId }, query: { status: OPEN_STATUSES, limit: 100, cursor } },
+          }),
+        );
+        open.push(...result.items);
+        cursor = result.nextCursor ?? undefined;
+        if (!cursor) break;
+      }
+      const today = todayIn(timeZone);
+      const weekEnd = addDays(today, 6);
+      return {
+        open: open.length,
+        dueThisWeek: open.filter((task) => task.dueDate && task.dueDate >= today && task.dueDate <= weekEnd).length,
+        paused: open.filter((task) => task.status === "paused").length,
+        overdue: open.filter((task) => task.overdue).length,
+      };
+    },
   });
 }
 

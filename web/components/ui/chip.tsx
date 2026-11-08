@@ -14,7 +14,7 @@ export function StateChip({ tone, children }: { tone: Tone; children: ReactNode 
   return (
     <span
       className={cn(
-        "inline-flex h-6 items-center gap-1.5 rounded-chip px-2 text-caption font-medium text-ink",
+        "inline-flex h-6 items-center gap-1.5 rounded-chip px-2 text-caption font-medium whitespace-nowrap text-ink",
         tones[tone].box,
       )}
     >

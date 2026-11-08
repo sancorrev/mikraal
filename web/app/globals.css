@@ -15,6 +15,12 @@
   --orange: #fe4a23;
   --orange-light: #ffede7;
   --on-violet: #0a0a0a;
+  /* App frame: grey canvas behind the content panel; wells hold board columns. */
+  --canvas: #f1f1f1;
+  --panel: #fafafa;
+  --well: #f3f3f3;
+  /* Between violet-light and violet: tasks due this week, avatars. Text on it in ink. */
+  --violet-soft: #e4dbff;
   --popover-shadow: 0 4px 16px rgb(0 0 0 / 10%);
   --modal-shadow: 0 16px 48px rgb(0 0 0 / 18%);
   color-scheme: light;
@@ -32,6 +38,10 @@
     --border-control: #7a7a7a;
     --violet-light: #2a2147;
     --orange-light: #3a1d15;
+    --canvas: #0a0a0a;
+    --panel: #121212;
+    --well: #0d0d0d;
+    --violet-soft: #3d2f6e;
     color-scheme: dark;
   }
 }
@@ -50,6 +60,10 @@
   --color-orange: var(--orange);
   --color-orange-light: var(--orange-light);
   --color-on-violet: var(--on-violet);
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-well: var(--well);
+  --color-violet-soft: var(--violet-soft);
 
   --font-heading: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
